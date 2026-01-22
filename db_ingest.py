@@ -3,12 +3,13 @@ import sqlite3
 import re
 from datetime import datetime
 from playwright.async_api import async_playwright
+from data_cleaner import keyword_filter
 
 from Source_scraper.blinkit_scraper import scrape_blinkit
 from Source_scraper.zepto_scraper import scrape_zepto
 
 
-DB_PATH = "data/smartsaver.db"
+DB_PATH = "/Users/jiteshvijaykumar/Downloads/SmartSaver/SmartSaverAI/data/smartsave.db"
 
 
 # ------------------ DB SETUP ------------------
@@ -88,6 +89,16 @@ def insert_product(conn, data):
     ))
     conn.commit()
 
+def remove_old_entries(conn, search_query):
+    """
+    Deletes entries for a specific search query to prevent duplicate/stale data.
+    Example: If updating 'Milk', remove all old 'Milk' rows first.
+    """
+    cur = conn.cursor()
+    cur.execute("DELETE FROM products WHERE search_query = ?", (search_query,))
+    conn.commit()
+    print(f"   🧹 Cleared old records for '{search_query}'")
+
 
 # ------------------ MAIN PIPELINE ------------------
 
@@ -120,31 +131,47 @@ async def main():
                 scrape_blinkit(page_blinkit, item),
                 scrape_zepto(page_zepto, item)
             )
+            raw_items = []
+            for p in blinkit_results:
+                p['source'] = 'blinkit'
+                raw_items.append(p)
+            
+            for p in zepto_results:
+                p['source'] = 'zepto'
+                raw_items.append(p)
 
-            all_results = [
-                ("blinkit", blinkit_results),
-                ("zepto", zepto_results)
-            ]
+            total_found = len(raw_items)
 
-            for source, results in all_results:
-                for r in results:
-                    qty_val, qty_unit = parse_quantity(r.get("weight"))
+            if total_found > 0:
+                # 3. APPLY KEYWORD FILTER
+                clean_items = keyword_filter(raw_items, item)
 
-                    record = {
-                        "source": source,
-                        "search_query": item,
-                        "product_name": r["name"],
-                        "brand": extract_brand(r["name"]),
-                        "price": r["price"],
-                        "raw_quantity": r.get("weight"),
-                        "quantity_value": qty_val,
-                        "quantity_unit": qty_unit,
-                        "scraped_at": datetime.utcnow()
-                    }
+                if clean_items:
+                    # 4. DELETE OLD DATA (Only if we have valid new data)
+                    remove_old_entries(conn, item)
 
-                    insert_product(conn, record)
+                    # 5. INSERT CLEAN DATA
+                    for r in clean_items:
+                        qty_val, qty_unit = parse_quantity(r.get("weight"))
 
-            print(f"   ✅ Stored {len(blinkit_results) + len(zepto_results)} records")
+                        record = {
+                            "source": r["source"], # Uses the tag we added above
+                            "search_query": item,
+                            "product_name": r["name"],
+                            "brand": extract_brand(r["name"]),
+                            "price": r["price"],
+                            "raw_quantity": r.get("weight"),
+                            "quantity_value": qty_val,
+                            "quantity_unit": qty_unit,
+                            "scraped_at": datetime.utcnow()
+                        }
+                        insert_product(conn, record)
+                    
+                    print(f"   ✅ Successfully inserted {len(clean_items)} records (filtered from {total_found}).")
+                else:
+                    print(f"   ⚠️ Scraper found items, but ALL were filtered out as irrelevant.")
+            else:
+                print(f"   ⚠️ Scraper returned 0 results for '{item}'. Keeping old data.")    
 
         await browser.close()
         conn.close()
