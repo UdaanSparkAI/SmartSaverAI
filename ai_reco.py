@@ -14,8 +14,8 @@ load_dotenv()
 # CONFIGURATION
 DB_PATH = "/Users/jiteshvijaykumar/Downloads/SmartSaver/SmartSaverAI/data/smartsave.db"
 # Use your specific Groq API Key
-GROQ_API_KEY = "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" 
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_MODEL = os.getenv("GROQ_MODEL")
 
 client = AsyncGroq(api_key=GROQ_API_KEY)
 
