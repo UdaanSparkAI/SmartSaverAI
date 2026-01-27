@@ -1,0 +1,7 @@
+groq
+playwright
+python-dotenv
+pandas
+sqlalchemy 
+psycopg2-binary
+python-telegram-bot
