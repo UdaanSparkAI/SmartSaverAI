@@ -5,10 +5,10 @@ from datetime import datetime
 from playwright.async_api import async_playwright
 from sqlalchemy import text
 
-from data_cleaner import keyword_filter, autocorrect_query
-from Source_scraper.blinkit_scraper import scrape_blinkit
-from Source_scraper.zepto_scraper import scrape_zepto
-from db_supabase import SessionLocal
+from .data_cleaner import keyword_filter, autocorrect_query
+from Backend.Source_scraper.blinkit_scraper import scrape_blinkit
+from Backend.Source_scraper.zepto_scraper import scrape_zepto
+from .db_supabase import SessionLocal
 
 
 # ------------------ HELPERS ------------------

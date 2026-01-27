@@ -6,12 +6,12 @@ from datetime import datetime
 from groq import AsyncGroq
 from dotenv import load_dotenv
 from difflib import SequenceMatcher
-from db_ingest import fetch_and_store_items
-from data_cleaner import autocorrect_query
+from .db_ingest import fetch_and_store_items
+from .data_cleaner import autocorrect_query
 
 
 from sqlalchemy import text
-from db_supabase import SessionLocal
+from .db_supabase import SessionLocal
 
 load_dotenv()
 
