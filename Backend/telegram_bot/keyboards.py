@@ -12,9 +12,6 @@ from Backend.categories import CATEGORIES
 # START / MAIN MENU
 # --------------------
 def start_keyboard():
-    """
-    Main entry keyboard shown on /start
-    """
     return ReplyKeyboardMarkup(
         [
             ["📂 Browse Categories", "🔍 Search Item Manually"]
@@ -28,17 +25,13 @@ def start_keyboard():
 # CATEGORY (INLINE)
 # --------------------
 def category_inline_keyboard():
-    """
-    Inline keyboard for top-level categories
-    """
     buttons = [
         [InlineKeyboardButton(cat, callback_data=f"cat|{cat}")]
         for cat in CATEGORIES.keys()
     ]
 
-    # Optional back button (future UX)
     buttons.append(
-        [InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="nav|back_main")]
+        [InlineKeyboardButton("🧺 View Basket", callback_data="basket|view")]
     )
 
     return InlineKeyboardMarkup(buttons)
@@ -48,9 +41,6 @@ def category_inline_keyboard():
 # SUBCATEGORY (INLINE)
 # --------------------
 def subcategory_inline_keyboard(category):
-    """
-    Inline keyboard for subcategories inside a category
-    """
     subcats = CATEGORIES.get(category)
     buttons = []
 
@@ -60,9 +50,8 @@ def subcategory_inline_keyboard(category):
                 [InlineKeyboardButton(sub, callback_data=f"subcat|{category}|{sub}")]
             )
 
-    # Back to categories
     buttons.append(
-        [InlineKeyboardButton("⬅️ Back to Categories", callback_data="nav|back_categories")]
+        [InlineKeyboardButton("🧺 View Basket", callback_data="basket|view")]
     )
 
     return InlineKeyboardMarkup(buttons)
@@ -72,22 +61,21 @@ def subcategory_inline_keyboard(category):
 # ITEMS (INLINE)
 # --------------------
 def items_inline_keyboard(category, subcategory=None):
-    """
-    Inline keyboard for final item selection
-    """
     if subcategory:
         items = CATEGORIES[category][subcategory]
     else:
         items = CATEGORIES[category]
 
     buttons = [
-        [InlineKeyboardButton(item, callback_data=f"item|{item}")]
+        [InlineKeyboardButton(f"➕ {item}", callback_data=f"item|{item}")]
         for item in items
     ]
 
-    # Back to subcategories
-    buttons.append(
-        [InlineKeyboardButton("⬅️ Back", callback_data=f"nav|back_subcat|{category}")]
-    )
+    buttons.extend([
+        [InlineKeyboardButton("➕ Add More Items", callback_data="basket|add_more")],
+        [InlineKeyboardButton("🧺 View Basket", callback_data="basket|view")],
+        [InlineKeyboardButton("🔍 Compare Basket", callback_data="basket|compare")]
+    ])
 
     return InlineKeyboardMarkup(buttons)
+
