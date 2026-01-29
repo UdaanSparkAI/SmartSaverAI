@@ -2,7 +2,10 @@
 
 from telegram import Update
 from telegram.ext import ContextTypes
-from ai_reco import get_telegram_message
+
+from Backend.ai_reco import get_telegram_message
+from Backend.categories import CATEGORIES
+
 from .keyboards import (
     start_keyboard,
     category_inline_keyboard,
@@ -10,12 +13,13 @@ from .keyboards import (
     items_inline_keyboard
 )
 
+
 # --------------------
 # /start command
 # --------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Reset any previous user state
     context.user_data.clear()
+    context.user_data["basket"] = []
 
     await update.message.reply_text(
         "👋 Welcome to *SmartSaverAI Groceries*\n\n"
@@ -30,41 +34,46 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Text message handler
 # --------------------
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
+    text = update.message.text.strip()
 
-    # OPTION 1: Browse Categories
     if text == "📂 Browse Categories":
-        # Switch off manual mode if previously enabled
         context.user_data.pop("mode", None)
+        context.user_data.setdefault("basket", [])
 
         await update.message.reply_text(
             "📦 Select a category:",
             reply_markup=category_inline_keyboard()
         )
 
-    # OPTION 2: Manual search
     elif text == "🔍 Search Item Manually":
         context.user_data["mode"] = "manual"
 
         await update.message.reply_text(
-            "✍️ Enter the item name (e.g. Milk, Onion):"
+            "✍️ Enter item names (comma-separated)\n"
+            "e.g. Milk, Onion"
         )
 
-    # Back to main menu
     elif text == "⬅️ Back":
         context.user_data.clear()
+        context.user_data["basket"] = []
 
         await update.message.reply_text(
             "Main menu:",
             reply_markup=start_keyboard()
         )
 
-    # Manual search input
     else:
         if context.user_data.get("mode") == "manual":
-            await update.message.reply_text("🔎 Analyzing...")
-            msg = await get_telegram_message(text)
-            await update.message.reply_text(msg, parse_mode="Markdown")
+            items = [i.strip() for i in text.split(",") if i.strip()]
+
+            for item in items:
+                await update.message.reply_text(
+                    f"🔎 Analyzing *{item}*...",
+                    parse_mode="Markdown"
+                )
+
+                msg = await get_telegram_message(item)
+                await update.message.reply_text(msg, parse_mode="Markdown")
 
 
 # --------------------
@@ -75,23 +84,30 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     data = query.data.split("|")
+    context.user_data.setdefault("basket", [])
 
     # --------------------
     # CATEGORY CLICK
-    # callback_data = cat|Fruits & Vegetables
     # --------------------
     if data[0] == "cat":
         category = data[1]
+        category_data = CATEGORIES.get(category)
 
-        await query.message.reply_text(
-            f"📂 *{category}*\nChoose a sub-category:",
-            reply_markup=subcategory_inline_keyboard(category),
-            parse_mode="Markdown"
-        )
+        if isinstance(category_data, dict):
+            await query.message.reply_text(
+                f"📂 *{category}*\nChoose a sub-category:",
+                reply_markup=subcategory_inline_keyboard(category),
+                parse_mode="Markdown"
+            )
+        else:
+            await query.message.reply_text(
+                f"🛒 *{category}* items:",
+                reply_markup=items_inline_keyboard(category),
+                parse_mode="Markdown"
+            )
 
     # --------------------
     # SUBCATEGORY CLICK
-    # callback_data = subcat|Fruits & Vegetables|Vegetables
     # --------------------
     elif data[0] == "subcat":
         _, category, subcategory = data
@@ -103,20 +119,64 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     # --------------------
-    # ITEM CLICK → AI SEARCH
-    # callback_data = item|Onion
+    # ITEM CLICK → ADD TO BASKET
     # --------------------
     elif data[0] == "item":
         item = data[1]
 
-        await query.message.reply_text("🔎 Analyzing...")
-        msg = await get_telegram_message(item)
-        await query.message.reply_text(msg, parse_mode="Markdown")
+        if item not in context.user_data["basket"]:
+            context.user_data["basket"].append(item)
+
+        await query.message.reply_text(
+            f"✅ *{item}* added to basket\n"
+            f"🧺 Basket: {', '.join(context.user_data['basket'])}",
+            parse_mode="Markdown"
+        )
 
     # --------------------
-    # NAVIGATION (future use)
-    # callback_data = nav|...
+    # VIEW BASKET
+    # --------------------
+    elif data[0] == "basket" and data[1] == "view":
+        basket = context.user_data.get("basket", [])
+
+        if not basket:
+            await query.message.reply_text("🧺 Your basket is empty.")
+        else:
+            await query.message.reply_text(
+                "🧺 *Your Basket:*\n" + "\n".join(f"• {i}" for i in basket),
+                parse_mode="Markdown"
+            )
+
+    # --------------------
+    # COMPARE BASKET
+    # --------------------
+    elif data[0] == "basket" and data[1] == "compare":
+        basket = context.user_data.get("basket", [])
+
+        if not basket:
+            await query.message.reply_text("🧺 Basket is empty.")
+            return
+
+        await query.message.reply_text(
+            "🔍 Comparing basket items...",
+            parse_mode="Markdown"
+        )
+
+        for item in basket:
+            msg = await get_telegram_message(item)
+            await query.message.reply_text(msg, parse_mode="Markdown")
+
+        context.user_data["basket"] = []
+        
+    elif data[0] == "basket" and data[1] == "add_more":
+        await query.message.reply_text(
+            "📦 Select a category:",
+            reply_markup=category_inline_keyboard()
+        )
+
+
+    # --------------------
+    # NAV (future)
     # --------------------
     elif data[0] == "nav":
-        # Navigation callbacks can be implemented later
         return
