@@ -2,7 +2,7 @@
 
 from telegram import Update
 from telegram.ext import ContextTypes
-from ai_reco import get_telegram_message
+from Backend.ai_reco import get_telegram_message
 from .keyboards import (
     start_keyboard,
     category_inline_keyboard,

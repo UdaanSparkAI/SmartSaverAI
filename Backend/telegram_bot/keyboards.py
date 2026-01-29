@@ -5,7 +5,7 @@ from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup
 )
-from categories import CATEGORIES
+from Backend.categories import CATEGORIES
 
 
 # --------------------

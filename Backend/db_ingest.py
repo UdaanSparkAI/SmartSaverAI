@@ -5,10 +5,11 @@ from datetime import datetime
 from playwright.async_api import async_playwright
 from sqlalchemy import text
 
-from data_cleaner import keyword_filter, autocorrect_query
-from Source_scraper.blinkit_scraper import scrape_blinkit
-from Source_scraper.zepto_scraper import scrape_zepto
-from db_supabase import SessionLocal
+from .data_cleaner import keyword_filter, autocorrect_query
+from Backend.Source_scraper.blinkit_scraper import scrape_blinkit
+from Backend.Source_scraper.zepto_scraper import scrape_zepto
+from Backend.Source_scraper.bigbasket_scraper import scrape_bigbasket
+from .db_supabase import SessionLocal
 
 
 # ------------------ HELPERS ------------------
@@ -45,7 +46,7 @@ def parse_quantity(raw_qty: str):
 
     # --- PRIORITY 1: Inside Parentheses (The most accurate source) ---
     # Looks for "(3 pairs)", "(500 g)", "(10 sheets)"
-    match_inside = re.search(r"\(\s*(\d+(?:\.\d+)?)\s*(pair|pairs|set|sets|roll|rolls|sheet|sheets|tablet|tablets|sachet|sachets|ml|l|g|kg|gm|pc|pcs)\s*\)", raw_qty)
+    match_inside = re.search(r"\(\s*(\d+(?:\.\d+)?)\s*(pair|pairs|set|sets|roll|rolls|sheet|sheets|tablet|tablets|sachet|sachets|ml|l|g|kg|gm|pc)\s*\)", raw_qty)
     if match_inside:
         val = float(match_inside.group(1))
         unit = match_inside.group(2)
@@ -87,7 +88,7 @@ def remove_old_entries(db, search_query: str):
     to avoid stale / duplicate data.
     """
     db.execute(
-        text("DELETE FROM products WHERE search_query = :q"),
+        text("DELETE FROM test_products WHERE search_query = :q"),
         {"q": search_query}
     )
     db.commit()
@@ -100,7 +101,7 @@ def insert_product(db, data: dict):
     """
     db.execute(
         text("""
-            INSERT INTO products (
+            INSERT INTO test_products (
                 source,
                 search_query,
                 product_name,
@@ -146,6 +147,7 @@ async def fetch_and_store_items(items):
 
         page_blinkit = await context.new_page()
         page_zepto = await context.new_page()
+        page_bigbasket = await context.new_page()
 
         for raw_item in items:
             item = autocorrect_query(raw_item)
@@ -156,9 +158,10 @@ async def fetch_and_store_items(items):
             print(f"\n🌍 Live Scraping for '{item.upper()}'...")
 
             # 1. Scrape Parallel
-            blinkit_results, zepto_results = await asyncio.gather(
+            blinkit_results, zepto_results, bigbasket_results = await asyncio.gather(
                 scrape_blinkit(page_blinkit, item),
-                scrape_zepto(page_zepto, item)
+                scrape_zepto(page_zepto, item),
+                scrape_bigbasket(page_bigbasket, item)
             )
 
             print("blinkit_results -->", blinkit_results)
@@ -171,6 +174,9 @@ async def fetch_and_store_items(items):
                 raw_items.append(p)
             for p in zepto_results:
                 p['source'] = 'zepto'
+                raw_items.append(p)
+            for p in bigbasket_results:
+                p['source'] = 'bigbasket'
                 raw_items.append(p)
 
             total_found = len(raw_items)
