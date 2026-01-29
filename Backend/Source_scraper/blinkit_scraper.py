@@ -4,10 +4,11 @@ from playwright.async_api import async_playwright, Page
 
 
 def clean_price(text_line):
-    matches = re.findall(r"₹\s*(\d+)", text_line)
+    matches = re.findall(r"₹\s*(\d+(?:\.\d+)?)", text_line)
     if not matches:
-        return 0
-    return min(int(p) for p in matches)
+        return 0.0
+    # Convert to float to keep decimals
+    return min(float(p) for p in matches)
 
 
 async def scrape_blinkit(page: Page, query: str):
